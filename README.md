@@ -1,6 +1,6 @@
 # Create table of records type of T
 
-Beginner level tasks for practicing reflection.
+Intermedite level tasks for practicing reflection.
 
 Estimated time to complete the task - 3h.
 
