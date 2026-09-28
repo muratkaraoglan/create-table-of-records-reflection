@@ -1,4 +1,4 @@
-﻿namespace TableOfRecords;
+namespace TableOfRecords;
 
 /// <summary>
 /// Presents method that write in table form to the text stream a set of elements of type T.
@@ -18,6 +18,88 @@ public static class TableOfRecordsCreator
     /// <exception cref="ArgumentException">Throw if <paramref name="collection"/> is empty.</exception>
     public static void WriteTable<T>(ICollection<T>? collection, TextWriter? writer)
     {
-        throw new NotImplementedException();
+        ArgumentNullException.ThrowIfNull(collection);
+        ArgumentNullException.ThrowIfNull(writer);
+
+        if (collection.Count == 0)
+        {
+            throw new ArgumentException("Collection must not be empty", nameof(collection));
+        }
+
+        var properties = typeof(T).GetProperties();
+
+        var columnWidths = properties.ToDictionary(
+            property => property.Name,
+            property =>
+            {
+                var maxValueLength = collection
+                    .Select(item =>
+                        property.GetValue(item)?.ToString() ?? string.Empty)
+                    .Max(value => value.Length);
+
+                return Math.Max(
+                    property.Name.Length,
+                    maxValueLength);
+            });
+
+        string CreateSeparator()
+        {
+            return "+" +
+                   string.Join(
+                       "+",
+                       properties.Select(property =>
+                           new string(
+                               '-',
+                               columnWidths[property.Name] + 2))) +
+                   "+" +
+                   Environment.NewLine;
+        }
+
+        string CreateHeader()
+        {
+            var cells = properties
+                .Select(property =>
+                    $" {property.Name.PadRight(columnWidths[property.Name])} ");
+
+            return "|" +
+                   string.Join("|", cells) +
+                   "|" +
+                   Environment.NewLine;
+        }
+
+        string CreateRow(T item)
+        {
+            var cells = properties.Select(property =>
+            {
+                var value =
+                    property.GetValue(item)?.ToString()
+                    ?? string.Empty;
+
+                if (property.PropertyType == typeof(string) || property.PropertyType == typeof(char))
+                {
+                    return $" {value.PadRight(columnWidths[property.Name])} ";
+                }
+
+                return $" {value.PadLeft(columnWidths[property.Name])} ";
+            });
+
+            return "|" +
+                   string.Join("|", cells) +
+                   "|" +
+                   Environment.NewLine;
+        }
+
+        writer.Write(CreateSeparator());
+        writer.Write(CreateHeader());
+        writer.Write(CreateSeparator());
+
+        foreach (var item in collection)
+        {
+            writer.Write(CreateRow(item));
+            writer.Write(CreateSeparator());
+        }
+
+        writer.Flush();
     }
+
 }
