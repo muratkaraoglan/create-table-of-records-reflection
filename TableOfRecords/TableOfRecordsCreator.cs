@@ -101,5 +101,4 @@ public static class TableOfRecordsCreator
 
         writer.Flush();
     }
-
 }
