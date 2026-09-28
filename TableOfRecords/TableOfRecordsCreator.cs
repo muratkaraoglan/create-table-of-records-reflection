@@ -1,3 +1,7 @@
+using System.Globalization;
+using System.Reflection;
+using System.Text;
+
 namespace TableOfRecords;
 
 /// <summary>
@@ -5,6 +9,11 @@ namespace TableOfRecords;
 /// </summary>
 public static class TableOfRecordsCreator
 {
+    private const char CornerChar = '+';
+    private const char HorizontalChar = '-';
+    private const char VerticalChar = '|';
+    private const int CellPadding = 2;
+
     /// <summary>
     /// Write in table form to the text stream a set of elements of type T (<see cref="ICollection{T}"/>),
     /// where the state of each object of type T is described by public properties that have only build-in
@@ -23,10 +32,12 @@ public static class TableOfRecordsCreator
 
         if (collection.Count == 0)
         {
-            throw new ArgumentException("Collection must not be empty", nameof(collection));
+            throw new ArgumentException(
+                "Collection must not be empty",
+                nameof(collection));
         }
 
-        var properties = typeof(T).GetProperties();
+        var properties = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance);
 
         var columnWidths = properties.ToDictionary(
             property => property.Name,
@@ -34,7 +45,7 @@ public static class TableOfRecordsCreator
             {
                 var maxValueLength = collection
                     .Select(item =>
-                        property.GetValue(item)?.ToString() ?? string.Empty)
+                        Convert.ToString(property.GetValue(item), CultureInfo.InvariantCulture) ?? string.Empty)
                     .Max(value => value.Length);
 
                 return Math.Max(
@@ -44,27 +55,32 @@ public static class TableOfRecordsCreator
 
         string CreateSeparator()
         {
-            return "+" +
+            return CornerChar +
                    string.Join(
-                       "+",
+                       CornerChar,
                        properties.Select(property =>
                            new string(
-                               '-',
-                               columnWidths[property.Name] + 2))) +
-                   "+" +
+                               HorizontalChar,
+                               columnWidths[property.Name] + CellPadding))) +
+                   CornerChar +
                    Environment.NewLine;
         }
 
         string CreateHeader()
         {
-            var cells = properties
-                .Select(property =>
-                    $" {property.Name.PadRight(columnWidths[property.Name])} ");
+            var cells = properties.Select(property =>
+                $" {property.Name.PadRight(columnWidths[property.Name])} ");
 
-            return "|" +
-                   string.Join("|", cells) +
-                   "|" +
+            return VerticalChar +
+                   string.Join(VerticalChar, cells) +
+                   VerticalChar +
                    Environment.NewLine;
+        }
+
+        bool IsLeftAligned(Type type)
+        {
+            var underlyingType = Nullable.GetUnderlyingType(type) ?? type;
+            return underlyingType == typeof(string) || underlyingType == typeof(char);
         }
 
         string CreateRow(T item)
@@ -72,10 +88,9 @@ public static class TableOfRecordsCreator
             var cells = properties.Select(property =>
             {
                 var value =
-                    property.GetValue(item)?.ToString()
-                    ?? string.Empty;
+                    Convert.ToString(property.GetValue(item), CultureInfo.InvariantCulture) ?? string.Empty;
 
-                if (property.PropertyType == typeof(string) || property.PropertyType == typeof(char))
+                if (IsLeftAligned(property.PropertyType))
                 {
                     return $" {value.PadRight(columnWidths[property.Name])} ";
                 }
@@ -83,22 +98,25 @@ public static class TableOfRecordsCreator
                 return $" {value.PadLeft(columnWidths[property.Name])} ";
             });
 
-            return "|" +
-                   string.Join("|", cells) +
-                   "|" +
+            return VerticalChar +
+                   string.Join(VerticalChar, cells) +
+                   VerticalChar +
                    Environment.NewLine;
         }
 
-        writer.Write(CreateSeparator());
-        writer.Write(CreateHeader());
-        writer.Write(CreateSeparator());
+        var builder = new StringBuilder();
+
+        builder.Append(CreateSeparator());
+        builder.Append(CreateHeader());
+        builder.Append(CreateSeparator());
 
         foreach (var item in collection)
         {
-            writer.Write(CreateRow(item));
-            writer.Write(CreateSeparator());
+            builder.Append(CreateRow(item));
+            builder.Append(CreateSeparator());
         }
 
+        writer.Write(builder.ToString());
         writer.Flush();
     }
 }
